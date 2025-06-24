@@ -9,6 +9,10 @@ import SwiftUI
 
 @main
 struct offlineSyncTodoApp: App {
+    init() {
+        TaskRepository().generateDummyTasks()
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()
