@@ -11,7 +11,7 @@ import RealmSwift
 
 struct EditTaskView: View {
     @Binding var task: TaskItem?
-
+    let conflictStrategy: String
     @State private var editedTitle: String = ""
     @State private var editedContent: String = ""
 
@@ -62,6 +62,13 @@ struct EditTaskView: View {
                 task!.content = editedContent
                 task!.isContentModified = true
                 didModify = true
+            }
+            
+            if conflictStrategy == "VV" {
+                let deviceId = DeviceManager.shared.id
+                let currentCount = task?.versionVector[deviceId] ?? 0
+                task?.versionVector[deviceId] = currentCount + 1
+
             }
 
             if didModify {

@@ -151,7 +151,7 @@ struct ContentView: View {
             .navigationTitle("Offline Tasks")
         } // <- NavigationView ends here
         .sheet(item: $selectedTask) { task in
-            EditTaskView(task: $selectedTask)
+            EditTaskView(task: $selectedTask, conflictStrategy: viewModel.conflictStrategy)
         }
         .alert("Sync Report", isPresented: $viewModel.showReport) {
             Button("OK", role: .cancel) {}
