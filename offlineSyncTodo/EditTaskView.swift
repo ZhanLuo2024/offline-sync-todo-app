@@ -66,9 +66,16 @@ struct EditTaskView: View {
             
             if conflictStrategy == "VV" {
                 let deviceId = DeviceManager.shared.id
-                let currentCount = task?.versionVector[deviceId] ?? 0
-                task?.versionVector[deviceId] = currentCount + 1
 
+                if task!.title != editedTitle {
+                    let current = task!.titleVersion[deviceId] ?? 0
+                    task!.titleVersion[deviceId] = current + 1
+                }
+
+                if task!.content != editedContent {
+                    let current = task!.contentVersion[deviceId] ?? 0
+                    task!.contentVersion[deviceId] = current + 1
+                }
             }
 
             if didModify {

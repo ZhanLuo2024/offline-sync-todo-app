@@ -43,22 +43,24 @@ struct ConflictResolver {
     }
     
     static func resolve(local: TaskItem, remote: TaskItem, deviceId: String) -> TaskItem {
-        var merged = local
+        let merged = local
 
-        // title 不同時，先看是否真的改了不同欄位
+        // title 比較
         if local.title != remote.title {
-            let localTitleVV = local.getFieldVersion(for: "title")
-            let remoteTitleVV = remote.getFieldVersion(for: "title")
-
+            let localTitleVV = Dictionary(uniqueKeysWithValues: local.titleVersion.map { ($0.key, $0.value) })
+            let remoteTitleVV = Dictionary(uniqueKeysWithValues: remote.titleVersion.map { ($0.key, $0.value) })
 
             let titleCompare = compareVV(local: localTitleVV, remote: remoteTitleVV)
 
             switch titleCompare {
             case .remoteNewer:
                 merged.title = remote.title
-                merged.setFieldVersion(for: "title", versions: remoteTitleVV)
+                merged.titleVersion.removeAll()
+                for key in remote.titleVersion.keys {
+                    merged.titleVersion[key] = remote.titleVersion[key]
+                }
             case .concurrent:
-                // 暫不處理衝突（C1/C3）
+                // 暫不處理衝突
                 break
             default:
                 break
@@ -67,22 +69,25 @@ struct ConflictResolver {
 
         // content 比較
         if local.content != remote.content {
-            let localContentVV = local.getFieldVersion(for: "content")
-            let remoteContentVV = remote.getFieldVersion(for: "content")
+            let localContentVV = Dictionary(uniqueKeysWithValues: local.contentVersion.map { ($0.key, $0.value) })
+            let remoteContentVV = Dictionary(uniqueKeysWithValues: remote.contentVersion.map { ($0.key, $0.value) })
 
             let contentCompare = compareVV(local: localContentVV, remote: remoteContentVV)
 
             switch contentCompare {
             case .remoteNewer:
                 merged.content = remote.content
-                merged.setFieldVersion(for: "content", versions: remoteContentVV)
+                merged.contentVersion.removeAll()
+                for key in remote.contentVersion.keys {
+                    merged.contentVersion[key] = remote.contentVersion[key]
+                }
             case .concurrent:
-                // 暫不處理衝突
                 break
             default:
                 break
             }
         }
+
 
         return merged
     }

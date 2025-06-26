@@ -73,7 +73,10 @@ class MainViewModel: ObservableObject {
             if conflictStrategy == "LWW" {
                 t["lastModified"] = task.lastModified.timeIntervalSince1970
             } else if conflictStrategy == "VV" {
-                t["versionVector"] = task.versionVector
+                t["versionVector"] = [
+                    "titleVersion": Dictionary(uniqueKeysWithValues: task.titleVersion.map { ($0.key, $0.value) }),
+                    "contentVersion": Dictionary(uniqueKeysWithValues: task.contentVersion.map { ($0.key, $0.value) })
+                ]
             }
 
             return t
