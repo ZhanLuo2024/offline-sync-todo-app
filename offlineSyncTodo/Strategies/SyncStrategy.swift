@@ -10,6 +10,5 @@ import Foundation
 import RealmSwift
 
 protocol SyncStrategy {
-    var strategyName: String { get }
-    func prepareTasks(for tasks: [TaskItem]) -> [TaskItem]
+    func sync(completion: @escaping (SyncReport) -> Void)
 }

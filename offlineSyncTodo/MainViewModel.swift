@@ -35,7 +35,14 @@ class MainViewModel: ObservableObject {
     @Published var reloadToken = UUID()
     @Published var isEditing = false
     @Published var syncLogs: [SyncLog] = []
-
+    
+    @Published var lastSyncTime: Date = {
+        if let saved = UserDefaults.standard.object(forKey: "lastSyncTime") as? Date {
+            return saved
+        } else {
+            return Date(timeIntervalSince1970: 0)
+        }
+    }()
 
     init() {
         loadTasks()
@@ -49,9 +56,18 @@ class MainViewModel: ObservableObject {
     func currentStrategy() -> SyncStrategy {
         switch syncMode {
         case .full:
-            return FullSyncStrategy()
+            return FullSyncStrategy(
+                repository: repository,
+                deviceId: DeviceManager.shared.id,
+                conflictStrategy: conflictStrategy
+            )
         case .delta:
-            return DeltaSyncStrategy()
+            return DeltaSyncStrategy(
+                repository: repository,
+                deviceId: DeviceManager.shared.id,
+                conflictStrategy: conflictStrategy,
+                lastSyncTime: lastSyncTime
+            )
         }
     }
 
@@ -60,107 +76,22 @@ class MainViewModel: ObservableObject {
         isSyncing = true
 
         let strategy = currentStrategy()
-        let prepared = strategy.prepareTasks(for: tasks)
-        let syncModeStr = syncMode == .full ? "full" : "delta"
 
-        let mappedTasks = prepared.map { task -> [String: Any] in
-            var t: [String: Any] = [
-                "title": task.title,
-                "content": task.content,
-                "isCompleted": task.isCompleted
-            ]
-
-            if conflictStrategy == "LWW" {
-                t["lastModified"] = task.lastModified.timeIntervalSince1970
-            } else if conflictStrategy == "VV" {
-                t["versionVector"] = [
-                    "titleVersion": Dictionary(uniqueKeysWithValues: task.titleVersion.map { ($0.key, $0.value) }),
-                    "contentVersion": Dictionary(uniqueKeysWithValues: task.contentVersion.map { ($0.key, $0.value) })
-                ]
-            }
-
-            return t
-        }
-
-        let payload: [String: Any] = [
-            "mode": syncModeStr,
-            "strategy": conflictStrategy,
-            "tasks": mappedTasks
-        ]
-
-        guard let url = URL(string: "https://1gnwt3y456.execute-api.eu-west-1.amazonaws.com/prods/sync"),
-              let jsonData = try? JSONSerialization.data(withJSONObject: payload) else {
-            print("Invalid URL or JSON encoding")
-            self.isSyncing = false
-            return
-        }
-
-        let payloadSize = jsonData.count
-        let startTime = Date()
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = jsonData
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        strategy.sync { report in
             DispatchQueue.main.async {
                 self.isSyncing = false
-                let duration = Date().timeIntervalSince(startTime)
+                self.lastSyncTime = Date()
+                UserDefaults.standard.set(self.lastSyncTime, forKey: "lastSyncTime")
 
-                if let error = error {
-                    self.syncReportText = "Sync failed: \(error.localizedDescription)"
-                    self.syncLogs.append(SyncLog(
-                        success: false,
-                        sent: prepared.count,
-                        received: 0,
-                        timeUsed: duration,
-                        mode: syncModeStr.capitalized,
-                        strategy: self.conflictStrategy,
-                        payloadSize: payloadSize,
-                        timestamp: Date()
-                    ))
-                    self.showReport = true
-                    return
-                }
-
-                guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-                    self.syncReportText = "Invalid response"
-                    self.showReport = true
-                    return
-                }
-
-                let itemsReceived = json["itemsReceived"] as? Int ?? 0
-                let timeUsed = String(format: "%.2f", duration)
-
-                self.syncReportText = """
-                Sync successful
-                Items Sent: \(prepared.count)
-                Items Received: \(itemsReceived)
-                Payload: \(payloadSize) bytes
-                Time: \(timeUsed) sec
-                Mode: \(syncModeStr.capitalized)
-                Strategy: \(self.conflictStrategy)
-                """
-
-                self.syncLogs.append(SyncLog(
-                    success: true,
-                    sent: prepared.count,
-                    received: itemsReceived,
-                    timeUsed: duration,
-                    mode: syncModeStr.capitalized,
+                self.syncReportText = SyncLogger.formatReport(
+                    mode: self.syncMode,
                     strategy: self.conflictStrategy,
-                    payloadSize: payloadSize,
-                    timestamp: Date()
-                ))
-
+                    report: report
+                )
                 self.showReport = true
-                self.loadTasks()
             }
-        }.resume()
+        }
     }
-
     
     func generateTasks(count: Int) {
         self.tasks = []
@@ -177,10 +108,7 @@ class MainViewModel: ObservableObject {
     
     func fetchTasks() {
         self.tasks = repository.fetchTasks()
-            .sorted(byKeyPath: "lastModified", ascending: false)
-            .map { $0 } 
     }
-
 
 }
 
