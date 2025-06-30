@@ -17,6 +17,7 @@ class TaskItem: Object, Identifiable, Codable {
     @Persisted var lastModified: Date = Date()
     @Persisted var isTitleModified: Bool = false
     @Persisted var isContentModified: Bool = false
+    @Persisted var isPendingUpload: Bool = false
     @Persisted var titleVersion: Map<String, Int>
     @Persisted var contentVersion: Map<String, Int>
 

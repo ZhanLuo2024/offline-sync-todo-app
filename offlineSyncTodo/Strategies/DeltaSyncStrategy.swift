@@ -51,18 +51,42 @@ class DeltaSyncStrategy: SyncStrategy {
                             }
                         }
                     } else if self.conflictStrategy == "VV" {
-                        let resolved = ConflictResolver.resolve(local: local, remote: remote, deviceId: self.deviceId)
-                        if resolved != local {
-                            try! realm.write {
-                                realm.add(resolved, update: .modified)
-                            }
-                        } else {
+                        let merged = ConflictResolver.resolve(local: local, remote: remote, deviceId: self.deviceId)
+
+                        // VV 模式只要有合併過都標記為待上傳
+                        merged.isTitleModified = false
+                        merged.isContentModified = false
+                        merged.isPendingUpload = true
+
+                        // 判斷是否有衝突：目前策略是「title 或 content 無法判斷」視為衝突
+                        let titleConflict = local.title != remote.title &&
+                            ConflictResolver.compareVV(
+                                local: ConflictResolver.toDictionary(local.titleVersion),
+                                remote: ConflictResolver.toDictionary(remote.titleVersion)
+                            ) == .concurrent
+
+
+                        let contentConflict = local.content != remote.content &&
+                            ConflictResolver.compareVV(
+                                local: ConflictResolver.toDictionary(local.contentVersion),
+                                remote: ConflictResolver.toDictionary(remote.contentVersion)
+                            ) == .concurrent
+
+
+                        if titleConflict || contentConflict {
+                            // 加入衝突清單
                             DispatchQueue.main.async {
                                 ConflictCenter.shared.addConflict(local: local, remote: remote)
+                            }
+                        } else {
+                            // 沒衝突就直接寫入
+                            try! realm.write {
+                                realm.add(merged, update: .modified)
                             }
                         }
                     }
                 } else {
+                    // 本地不存在，新增
                     try! realm.write {
                         realm.add(remote)
                     }
@@ -74,7 +98,9 @@ class DeltaSyncStrategy: SyncStrategy {
     private func uploadLocalChanges(completion: @escaping (Int) -> Void) {
         DispatchQueue.main.async {
             let realm = try! Realm()
-            let pending = realm.objects(TaskItem.self).filter("isTitleModified == true OR isContentModified == true")
+            let pending = realm.objects(TaskItem.self).filter(
+                "isTitleModified == true OR isContentModified == true OR isPendingUpload == true"
+            )
             let tasksToUpload = Array(pending)
             let count = tasksToUpload.count
             self.repository.uploadTasks(tasksToUpload) {

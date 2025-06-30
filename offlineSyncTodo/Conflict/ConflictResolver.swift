@@ -7,6 +7,7 @@
 
 
 import Foundation
+import RealmSwift
 
 enum VVCompareResult {
     case localNewer
@@ -47,8 +48,8 @@ struct ConflictResolver {
 
         // title 比較
         if local.title != remote.title {
-            let localTitleVV = Dictionary(uniqueKeysWithValues: local.titleVersion.map { ($0.key, $0.value) })
-            let remoteTitleVV = Dictionary(uniqueKeysWithValues: remote.titleVersion.map { ($0.key, $0.value) })
+            let localTitleVV = toDictionary(local.titleVersion)
+            let remoteTitleVV = toDictionary(remote.titleVersion)
 
             let titleCompare = compareVV(local: localTitleVV, remote: remoteTitleVV)
 
@@ -69,8 +70,8 @@ struct ConflictResolver {
 
         // content 比較
         if local.content != remote.content {
-            let localContentVV = Dictionary(uniqueKeysWithValues: local.contentVersion.map { ($0.key, $0.value) })
-            let remoteContentVV = Dictionary(uniqueKeysWithValues: remote.contentVersion.map { ($0.key, $0.value) })
+            let localContentVV = toDictionary(local.contentVersion)
+            let remoteContentVV = toDictionary(remote.contentVersion)
 
             let contentCompare = compareVV(local: localContentVV, remote: remoteContentVV)
 
@@ -88,8 +89,13 @@ struct ConflictResolver {
             }
         }
 
-
         return merged
+    }
+
+
+    
+    static func toDictionary(_ map: Map<String, Int>) -> [String: Int] {
+        return Dictionary(uniqueKeysWithValues: map.map { ($0.key, $0.value) })
     }
 
 }

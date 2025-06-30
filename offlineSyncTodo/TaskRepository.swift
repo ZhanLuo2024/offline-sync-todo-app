@@ -11,6 +11,10 @@
 import Foundation
 import RealmSwift
 
+struct TaskListResponse: Codable {
+    let tasks: [TaskItem]
+}
+
 class TaskRepository {
     
     func fetchRemoteTasks(completion: @escaping ([TaskItem]) -> Void) {
@@ -20,35 +24,23 @@ class TaskRepository {
             return
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-
-        URLSession.shared.dataTask(with: request) { data, _, error in
-            guard let data = data, error == nil else {
-                print("Fetch failed: \(error?.localizedDescription ?? "Unknown error")")
+        let task = URLSession.shared.dataTask(with: url) { data, response, error in
+            guard let data = data else {
+                print("Fetch error: \(error?.localizedDescription ?? "Unknown error")")
                 completion([])
                 return
             }
 
             do {
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-
-                struct TaskResponse: Decodable {
-                    let tasks: [TaskItem]
-                }
-
-                let response = try decoder.decode(TaskResponse.self, from: data)
-                let remoteTasks = response.tasks
-                print("📥 Remote tasks received: \(remoteTasks.count)")
-                completion(remoteTasks)
-
+                let decoded = try JSONDecoder().decode(TaskListResponse.self, from: data)
+                completion(decoded.tasks)
             } catch {
                 print("Decode error: \(error)")
-                print("Raw data: \(String(data: data, encoding: .utf8) ?? "Unreadable")")
                 completion([])
             }
-        }.resume()
+        }
+
+        task.resume()
     }
 
 
