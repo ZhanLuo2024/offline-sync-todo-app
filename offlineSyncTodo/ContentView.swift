@@ -17,12 +17,12 @@ enum SyncMode: String, CaseIterable, Identifiable {
 struct ContentView: View {
     @StateObject private var viewModel = MainViewModel()
     @State private var selectedTask: TaskItem? = nil
-    @State private var showEditView: Bool = false
+    @State private var navigateToConflictResolution = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack {
-                // Sync Mode Picker
+                // --- Sync Mode Picker ---
                 Picker("Sync Mode", selection: $viewModel.syncMode) {
                     ForEach(SyncMode.allCases) { mode in
                         Text(mode.rawValue).tag(mode)
@@ -30,6 +30,25 @@ struct ContentView: View {
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding()
+                
+                Button("🛠️ 測試衝突解決畫面") {
+                    // 建立 Fake Tasks
+                    let local = TaskItem()
+                    local.title = "Demo Task"
+                    local.content = "Local Version"
+
+                    let remote = TaskItem()
+                    remote.title = "Demo Task"
+                    remote.content = "Remote Version"
+                    
+                    // 加入衝突
+                    ConflictCenter.shared.addConflict(local: local, remote: remote)
+                    
+                    // 發送通知讓畫面跳轉
+                    NotificationCenter.default.post(name: .didDetectConflicts, object: nil)
+                }
+                .buttonStyle(.bordered)
+                .padding(.bottom, 10)
 
                 Text("Conflict Resolution Strategy")
                     .font(.subheadline)
@@ -42,7 +61,7 @@ struct ContentView: View {
                 .pickerStyle(SegmentedPickerStyle())
                 .padding(.horizontal)
 
-                // Task control buttons
+                // --- Task Control Buttons ---
                 if viewModel.conflictStrategy == "LWW" {
                     HStack {
                         Text("Generate Tasks:")
@@ -75,7 +94,7 @@ struct ContentView: View {
                     }
                 }
 
-                // Task List
+                // --- Task List ---
                 List {
                     ForEach(viewModel.tasks, id: \.id.stringValue) { task in
                         VStack(alignment: .leading) {
@@ -131,6 +150,25 @@ struct ContentView: View {
                 .disabled(viewModel.isSyncing)
                 .buttonStyle(.borderedProminent)
             }
+
+            // --- Navigation Destination: Conflict Resolution ---
+            .navigationDestination(isPresented: $navigateToConflictResolution) {
+                ConflictResolutionView()
+            }
+
+            // --- Alert after Sync Report ---
+            .alert("Sync Report", isPresented: $viewModel.showReport) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(viewModel.syncReportText)
+            }
+
+            // --- Modal Sheet for Task Edit ---
+            .sheet(item: $selectedTask) { task in
+                EditTaskView(task: $selectedTask, conflictStrategy: viewModel.conflictStrategy)
+            }
+
+            // --- onAppear: load tasks and observe update notifications ---
             .onAppear {
                 viewModel.fetchTasks()
 
@@ -148,16 +186,15 @@ struct ContentView: View {
                     viewModel.fetchTasks()
                 }
             }
+
+            // --- onReceive: detect conflict and navigate ---
+            .onReceive(NotificationCenter.default.publisher(for: .didDetectConflicts)) { _ in
+                navigateToConflictResolution = true
+            }
+
             .navigationTitle("Offline Tasks")
-        } // <- NavigationView ends here
-        .sheet(item: $selectedTask) { task in
-            EditTaskView(task: $selectedTask, conflictStrategy: viewModel.conflictStrategy)
-        }
-        .alert("Sync Report", isPresented: $viewModel.showReport) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(viewModel.syncReportText)
-        }
+        } // <-- End NavigationStack
     }
 }
+
 

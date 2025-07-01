@@ -110,18 +110,5 @@ class DeltaSyncStrategy: SyncStrategy {
     }
 }
 
-class ConflictCenter: ObservableObject {
-    static let shared = ConflictCenter()
-    private init() {}
 
-    @Published var conflicts: [(local: TaskItem, remote: TaskItem)] = []
-
-    func addConflict(local: TaskItem, remote: TaskItem) {
-        conflicts.append((local, remote))
-    }
-
-    func clear() {
-        conflicts.removeAll()
-    }
-}
 

@@ -89,6 +89,11 @@ class MainViewModel: ObservableObject {
                     report: report
                 )
                 self.showReport = true
+                
+                if !ConflictCenter.shared.conflicts.isEmpty {
+                    // 觸發提示或跳轉
+                    NotificationCenter.default.post(name: .didDetectConflicts, object: nil)
+                }
             }
         }
     }
@@ -112,5 +117,9 @@ class MainViewModel: ObservableObject {
 
 }
 
+
+extension Notification.Name {
+    static let didDetectConflicts = Notification.Name("didDetectConflicts")
+}
 
 

@@ -99,3 +99,32 @@ struct ConflictResolver {
     }
 
 }
+
+extension ConflictResolver {
+    static func resolve(pair: ConflictPair, useRemote: Bool) {
+        let winner = useRemote ? pair.remote : pair.local
+        
+        if let realm = try? Realm() {
+            try? realm.write {
+                if let target = realm.object(ofType: TaskItem.self, forPrimaryKey: pair.local.id) {
+                    target.title = winner.title
+                    target.content = winner.content
+                    target.isPendingUpload = true
+                    target.lastModified = Date()
+                    
+                    // 把版本向量也設成贏家的版本（確保版本一致）
+                    target.titleVersion.removeAll()
+                    for key in winner.titleVersion.keys {
+                        target.titleVersion[key] = winner.titleVersion[key]
+                    }
+                    
+                    target.contentVersion.removeAll()
+                    for key in winner.contentVersion.keys {
+                        target.contentVersion[key] = winner.contentVersion[key]
+                    }
+                }
+            }
+        }
+    }
+}
+
