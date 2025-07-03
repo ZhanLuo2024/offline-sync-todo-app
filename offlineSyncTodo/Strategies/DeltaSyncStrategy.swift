@@ -27,11 +27,12 @@ class DeltaSyncStrategy: SyncStrategy {
         repository.fetchRemoteTasks { remoteTasks in
             let deltaRemoteTasks = remoteTasks.filter { $0.lastModified > self.lastSyncTime }
             let applied = self.applyRemoteTasks(deltaRemoteTasks)
-            self.uploadLocalChanges { itemsSent in
+            self.uploadLocalChanges { itemsSent, payloadSize in
                 let report = SyncReport(
                     itemsSent: itemsSent,
                     itemsReceived: deltaRemoteTasks.count,
-                    duration: Date().timeIntervalSince(startTime)
+                    duration: Date().timeIntervalSince(startTime),
+                    payloadSize: payloadSize
                 )
                 completion(report)
             }
@@ -95,16 +96,30 @@ class DeltaSyncStrategy: SyncStrategy {
         }
     }
 
-    private func uploadLocalChanges(completion: @escaping (Int) -> Void) {
+    private func uploadLocalChanges(completion: @escaping (Int, Int) -> Void) {
         DispatchQueue.main.async {
             let realm = try! Realm()
             let pending = realm.objects(TaskItem.self).filter(
                 "isTitleModified == true OR isContentModified == true OR isPendingUpload == true"
             )
             let tasksToUpload = Array(pending)
-            let count = tasksToUpload.count
-            self.repository.uploadTasks(tasksToUpload) {
-                completion(count)
+
+            guard !tasksToUpload.isEmpty else {
+                // 沒有需要上傳的
+                completion(0, 0)
+                return
+            }
+
+            self.repository.uploadTasks(tasksToUpload) { payloadSize in
+                // 標記這些任務為已上傳
+                try! realm.write {
+                    for task in tasksToUpload {
+                        task.isPendingUpload = false
+                        task.isTitleModified = false
+                        task.isContentModified = false
+                    }
+                }
+                completion(tasksToUpload.count, payloadSize)
             }
         }
     }

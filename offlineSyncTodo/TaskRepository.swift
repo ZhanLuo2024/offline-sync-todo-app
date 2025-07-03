@@ -18,7 +18,7 @@ struct TaskListResponse: Codable {
 class TaskRepository {
     
     func fetchRemoteTasks(completion: @escaping ([TaskItem]) -> Void) {
-        guard let url = URL(string: "https://1gnwt3y456.execute-api.eu-west-1.amazonaws.com/prods/sync") else {
+        guard let url = URL(string: "https://9uvddcutsc.execute-api.eu-west-1.amazonaws.com/prod/sync") else {
             print("Invalid URL")
             completion([])
             return
@@ -32,7 +32,10 @@ class TaskRepository {
             }
 
             do {
-                let decoded = try JSONDecoder().decode(TaskListResponse.self, from: data)
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+
+                let decoded = try decoder.decode(TaskListResponse.self, from: data)
                 completion(decoded.tasks)
             } catch {
                 print("Decode error: \(error)")
@@ -44,7 +47,7 @@ class TaskRepository {
     }
 
 
-    func uploadTasks(_ tasks: [TaskItem], completion: @escaping () -> Void) {
+    func uploadTasks(_ tasks: [TaskItem], completion: @escaping (Int) -> Void) {
         let syncModeStr = UserDefaults.standard.string(forKey: "syncMode") ?? "full"
         let conflictStrategy = UserDefaults.standard.string(forKey: "conflictStrategy") ?? "LWW"
 
@@ -73,13 +76,14 @@ class TaskRepository {
             "tasks": mappedTasks
         ]
 
-        guard let url = URL(string: "https://1gnwt3y456.execute-api.eu-west-1.amazonaws.com/prods/sync"),
+        guard let url = URL(string: "https://9uvddcutsc.execute-api.eu-west-1.amazonaws.com/prod/sync"),
               let jsonData = try? JSONSerialization.data(withJSONObject: payload) else {
             print("Invalid upload payload")
-            completion()
+            completion(0)
             return
         }
 
+        let payloadSize = jsonData.count
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -89,7 +93,9 @@ class TaskRepository {
             if let error = error {
                 print("Upload failed: \(error.localizedDescription)")
             }
-            completion()
+            DispatchQueue.main.async {
+                completion(payloadSize)
+            }
         }.resume()
     }
     
@@ -102,24 +108,29 @@ class TaskRepository {
     
     func clearAllTasks() {
         let realm = try! Realm()
-        let allTasks = realm.objects(TaskItem.self)
         try! realm.write {
-            realm.delete(allTasks)
+            realm.delete(realm.objects(TaskItem.self))
         }
     }
     
     func generateDummyTasks(count: Int) {
         let realm = try! Realm()
+        let tasks = (0..<count).map { i -> TaskItem in
+            let task = TaskItem()
+            task.id = "task-\(UUID().uuidString)"
+            task.title = "Task \(i)"
+            task.content = "Content \(i)"
+            task.lastModified = Date()
+            return task
+        }
+
         try! realm.write {
-            for i in 0..<count {
-                let task = TaskItem()
-                task.title = "Task \(i)"
-                task.content = "Content \(i)"
-                task.lastModified = Date()
-                realm.add(task)
-            }
+            realm.deleteAll()
+            realm.add(tasks)
         }
     }
+
+
     
     func randomlyModifyTasks(count: Int) {
         let realm = try! Realm()

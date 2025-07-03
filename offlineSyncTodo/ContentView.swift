@@ -11,7 +11,8 @@ import RealmSwift
 enum SyncMode: String, CaseIterable, Identifiable {
     case full = "Full Sync"
     case delta = "Delta Sync"
-    var id: String { rawValue }
+
+    var id: String { self.rawValue }
 }
 
 struct ContentView: View {
@@ -25,14 +26,14 @@ struct ContentView: View {
                 // --- Sync Mode Picker ---
                 Picker("Sync Mode", selection: $viewModel.syncMode) {
                     ForEach(SyncMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
+                        let text = Text(mode.rawValue)
+                        text.tag(mode)
                     }
                 }
                 .pickerStyle(SegmentedPickerStyle())
                 .padding()
-                
+
                 Button("🛠️ 測試衝突解決畫面") {
-                    // 建立 Fake Tasks
                     let local = TaskItem()
                     local.title = "Demo Task"
                     local.content = "Local Version"
@@ -40,11 +41,8 @@ struct ContentView: View {
                     let remote = TaskItem()
                     remote.title = "Demo Task"
                     remote.content = "Remote Version"
-                    
-                    // 加入衝突
+
                     ConflictCenter.shared.addConflict(local: local, remote: remote)
-                    
-                    // 發送通知讓畫面跳轉
                     NotificationCenter.default.post(name: .didDetectConflicts, object: nil)
                 }
                 .buttonStyle(.bordered)
@@ -96,7 +94,7 @@ struct ContentView: View {
 
                 // --- Task List ---
                 List {
-                    ForEach(viewModel.tasks, id: \.id.stringValue) { task in
+                    ForEach(viewModel.tasks, id: \.id) { task in
                         VStack(alignment: .leading) {
                             HStack {
                                 Text("📝 \(task.title)")
@@ -151,24 +149,20 @@ struct ContentView: View {
                 .buttonStyle(.borderedProminent)
             }
 
-            // --- Navigation Destination: Conflict Resolution ---
             .navigationDestination(isPresented: $navigateToConflictResolution) {
                 ConflictResolutionView()
             }
 
-            // --- Alert after Sync Report ---
             .alert("Sync Report", isPresented: $viewModel.showReport) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(viewModel.syncReportText)
             }
 
-            // --- Modal Sheet for Task Edit ---
             .sheet(item: $selectedTask) { task in
                 EditTaskView(task: $selectedTask, conflictStrategy: viewModel.conflictStrategy)
             }
 
-            // --- onAppear: load tasks and observe update notifications ---
             .onAppear {
                 viewModel.fetchTasks()
 
@@ -187,14 +181,15 @@ struct ContentView: View {
                 }
             }
 
-            // --- onReceive: detect conflict and navigate ---
             .onReceive(NotificationCenter.default.publisher(for: .didDetectConflicts)) { _ in
                 navigateToConflictResolution = true
             }
 
             .navigationTitle("Offline Tasks")
-        } // <-- End NavigationStack
+        }
     }
 }
+
+
 
 

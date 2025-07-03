@@ -12,6 +12,7 @@ struct SyncReport {
     let itemsSent: Int
     let itemsReceived: Int
     let duration: TimeInterval
+    var payloadSize: Int
 }
 
 class SyncLogger {
@@ -19,9 +20,8 @@ class SyncLogger {
     static func formatReport(mode: SyncMode, strategy: String, report: SyncReport) -> String {
         return """
         Sync successful
-        Items Sent: \(report.itemsSent)
-        Items Received: \(report.itemsReceived)
         Time: \(String(format: "%.2f", report.duration)) sec
+        Payload Size: \(report.payloadSize) bytes
         Mode: \(mode.rawValue)
         Strategy: \(strategy)
         """

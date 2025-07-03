@@ -25,11 +25,12 @@ class FullSyncStrategy: SyncStrategy {
 
         repository.fetchRemoteTasks { remoteTasks in
             self.applyRemoteTasks(remoteTasks)
-            self.uploadLocalChanges { itemsSent in
+            self.uploadLocalChanges { itemsSent, payloadSize in
                 let report = SyncReport(
                     itemsSent: itemsSent,
                     itemsReceived: remoteTasks.count,
-                    duration: Date().timeIntervalSince(startTime)
+                    duration: Date().timeIntervalSince(startTime),
+                    payloadSize: payloadSize
                 )
                 completion(report)
             }
@@ -56,14 +57,14 @@ class FullSyncStrategy: SyncStrategy {
         }
     }
 
-    private func uploadLocalChanges(completion: @escaping (Int) -> Void) {
+    private func uploadLocalChanges(completion: @escaping (Int, Int) -> Void) {
         DispatchQueue.main.async {
             let realm = try! Realm()
             let allTasks = realm.objects(TaskItem.self)
             let detachedTasks = allTasks.map { $0.detached() }
             let count = detachedTasks.count
-            self.repository.uploadTasks(Array(detachedTasks)) {
-                completion(count)
+            self.repository.uploadTasks(Array(detachedTasks)) { payloadSize in
+                completion(count, payloadSize)
             }
         }
     }

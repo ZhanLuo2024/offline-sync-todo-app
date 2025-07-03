@@ -11,7 +11,7 @@ import Combine
 import RealmSwift
 
 struct ConflictPair: Identifiable, Equatable {
-    var id: ObjectId { local.id }
+    var id: String { local.id }
     let local: TaskItem
     let remote: TaskItem
 

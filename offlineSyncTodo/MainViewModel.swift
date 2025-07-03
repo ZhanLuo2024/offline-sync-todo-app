@@ -80,8 +80,10 @@ class MainViewModel: ObservableObject {
         strategy.sync { report in
             DispatchQueue.main.async {
                 self.isSyncing = false
-                self.lastSyncTime = Date()
-                UserDefaults.standard.set(self.lastSyncTime, forKey: "lastSyncTime")
+                if report.itemsSent > 0 || report.itemsReceived > 0 {
+                    self.lastSyncTime = Date()
+                    UserDefaults.standard.set(self.lastSyncTime, forKey: "lastSyncTime")
+                }
 
                 self.syncReportText = SyncLogger.formatReport(
                     mode: self.syncMode,

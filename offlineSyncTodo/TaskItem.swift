@@ -10,7 +10,7 @@ import Foundation
 import RealmSwift
 
 class TaskItem: Object, Identifiable, Codable {
-    @Persisted(primaryKey: true) var id: ObjectId = ObjectId.generate()
+    @Persisted(primaryKey: true) var id: String = UUID().uuidString
     @Persisted var title: String = ""
     @Persisted var content: String = ""
     @Persisted var isCompleted: Bool = false
@@ -30,7 +30,7 @@ class TaskItem: Object, Identifiable, Codable {
     required convenience init(from decoder: Decoder) throws {
         self.init()
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.id = try container.decode(ObjectId.self, forKey: .id)
+        self.id = try container.decode(String.self, forKey: .id)
         self.title = try container.decode(String.self, forKey: .title)
         self.content = try container.decode(String.self, forKey: .content)
         self.isCompleted = try container.decode(Bool.self, forKey: .isCompleted)
