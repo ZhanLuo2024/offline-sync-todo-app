@@ -129,23 +129,6 @@ class TaskRepository {
             realm.add(tasks)
         }
     }
-
-
-    
-    func randomlyModifyTasks(count: Int) {
-        let realm = try! Realm()
-        let tasks = realm.objects(TaskItem.self)
-        guard tasks.count > 0 else { return }
-
-        try! realm.write {
-            for _ in 0..<count {
-                if let randomTask = tasks.randomElement() {
-                    randomTask.title += " (modified)"
-                    randomTask.lastModified = Date()
-                }
-            }
-        }
-    }
 }
 
 

@@ -5,7 +5,6 @@
 //  Created by Luo HY on 20/05/2025.
 //
 
-
 import Foundation
 import RealmSwift
 import Combine
@@ -21,7 +20,6 @@ struct SyncLog: Identifiable {
     let payloadSize: Int
     let timestamp: Date
 }
-
 
 class MainViewModel: ObservableObject {
     private let repository = TaskRepository()
@@ -93,7 +91,6 @@ class MainViewModel: ObservableObject {
                 self.showReport = true
                 
                 if !ConflictCenter.shared.conflicts.isEmpty {
-                    // 觸發提示或跳轉
                     NotificationCenter.default.post(name: .didDetectConflicts, object: nil)
                 }
             }
@@ -107,21 +104,12 @@ class MainViewModel: ObservableObject {
         repository.generateDummyTasks(count: count)
         loadTasks()
     }
-
-    func randomModify(count: Int) {
-        repository.randomlyModifyTasks(count: count)
-        loadTasks()
-    }
     
     func fetchTasks() {
         self.tasks = repository.fetchTasks()
     }
-
 }
-
 
 extension Notification.Name {
     static let didDetectConflicts = Notification.Name("didDetectConflicts")
 }
-
-

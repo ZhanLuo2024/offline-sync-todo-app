@@ -24,9 +24,11 @@ class DeltaSyncStrategy: SyncStrategy {
     func sync(completion: @escaping (SyncReport) -> Void) {
         let startTime = Date()
 
+        markLocalTasksForUpload()
+
         repository.fetchRemoteTasks { remoteTasks in
             let deltaRemoteTasks = remoteTasks.filter { $0.lastModified > self.lastSyncTime }
-            let applied = self.applyRemoteTasks(deltaRemoteTasks)
+            self.applyRemoteTasks(deltaRemoteTasks)
             self.uploadLocalChanges { itemsSent, payloadSize in
                 let report = SyncReport(
                     itemsSent: itemsSent,
@@ -38,6 +40,45 @@ class DeltaSyncStrategy: SyncStrategy {
             }
         }
     }
+
+    // Automatically marks a gradient number of local tasks as modified (based on total count)
+    private func markLocalTasksForUpload() {
+        DispatchQueue.main.async {
+            let realm = try! Realm()
+            let allTasks = realm.objects(TaskItem.self)
+            guard !allTasks.isEmpty else { return }
+
+            let total = allTasks.count
+
+            // Determine how many to mark based on gradient thresholds
+            let countToModify: Int
+            switch total {
+            case 0..<50:
+                countToModify = min(5, total)
+            case 50..<101:
+                countToModify = min(10, total)
+            case 100..<501:
+                countToModify = min(50, total)
+            default:
+                countToModify = min(100, total)
+            }
+
+            // Randomly pick tasks and mark as modified
+            let shuffled = Array(allTasks).shuffled()
+            let tasksToMark = shuffled.prefix(countToModify)
+
+            try! realm.write {
+                for task in tasksToMark {
+                    task.title += " (modified)"
+                    task.lastModified = Date()
+                    task.isPendingUpload = true
+                }
+            }
+
+            print("Marked \(countToModify) of \(total) tasks as modified for delta sync.")
+        }
+    }
+
 
     private func applyRemoteTasks(_ remoteTasks: [TaskItem]) {
         DispatchQueue.main.async {
@@ -54,18 +95,17 @@ class DeltaSyncStrategy: SyncStrategy {
                     } else if self.conflictStrategy == "VV" {
                         let merged = ConflictResolver.resolve(local: local, remote: remote, deviceId: self.deviceId)
 
-                        // VV 模式只要有合併過都標記為待上傳
+                        // VV mode always marks merged tasks for upload
                         merged.isTitleModified = false
                         merged.isContentModified = false
                         merged.isPendingUpload = true
 
-                        // 判斷是否有衝突：目前策略是「title 或 content 無法判斷」視為衝突
+                        // Detect conflict if VV vectors are concurrent
                         let titleConflict = local.title != remote.title &&
                             ConflictResolver.compareVV(
                                 local: ConflictResolver.toDictionary(local.titleVersion),
                                 remote: ConflictResolver.toDictionary(remote.titleVersion)
                             ) == .concurrent
-
 
                         let contentConflict = local.content != remote.content &&
                             ConflictResolver.compareVV(
@@ -73,21 +113,20 @@ class DeltaSyncStrategy: SyncStrategy {
                                 remote: ConflictResolver.toDictionary(remote.contentVersion)
                             ) == .concurrent
 
-
                         if titleConflict || contentConflict {
-                            // 加入衝突清單
+                            // Add to conflict list
                             DispatchQueue.main.async {
                                 ConflictCenter.shared.addConflict(local: local, remote: remote)
                             }
                         } else {
-                            // 沒衝突就直接寫入
+                            // No conflict, write merged task
                             try! realm.write {
                                 realm.add(merged, update: .modified)
                             }
                         }
                     }
                 } else {
-                    // 本地不存在，新增
+                    // Local task doesn't exist, insert new
                     try! realm.write {
                         realm.add(remote)
                     }
@@ -96,6 +135,7 @@ class DeltaSyncStrategy: SyncStrategy {
         }
     }
 
+    /// Uploads all pending tasks to the server
     private func uploadLocalChanges(completion: @escaping (Int, Int) -> Void) {
         DispatchQueue.main.async {
             let realm = try! Realm()
@@ -105,13 +145,13 @@ class DeltaSyncStrategy: SyncStrategy {
             let tasksToUpload = Array(pending)
 
             guard !tasksToUpload.isEmpty else {
-                // 沒有需要上傳的
+                // Nothing to upload
                 completion(0, 0)
                 return
             }
 
             self.repository.uploadTasks(tasksToUpload) { payloadSize in
-                // 標記這些任務為已上傳
+                // Mark tasks as uploaded
                 try! realm.write {
                     for task in tasksToUpload {
                         task.isPendingUpload = false
@@ -124,6 +164,3 @@ class DeltaSyncStrategy: SyncStrategy {
         }
     }
 }
-
-
-
