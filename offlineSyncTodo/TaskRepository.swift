@@ -53,6 +53,7 @@ class TaskRepository {
 
         let mappedTasks: [[String: Any]] = tasks.map { task in
             var dict: [String: Any] = [
+                "id": task.id,
                 "title": task.title,
                 "content": task.content,
                 "isCompleted": task.isCompleted
@@ -101,9 +102,7 @@ class TaskRepository {
     
     func fetchTasks() -> [TaskItem] {
         let realm = try! Realm()
-        let results = realm.objects(TaskItem.self)
-            .sorted(byKeyPath: "lastModified", ascending: false)
-        return results.map { $0.detached() }
+        return Array(realm.objects(TaskItem.self).sorted(byKeyPath: "lastModified", ascending: false))
     }
     
     func clearAllTasks() {
@@ -115,9 +114,9 @@ class TaskRepository {
     
     func generateDummyTasks(count: Int) {
         let realm = try! Realm()
-        let tasks = (0..<count).map { i -> TaskItem in
+        let tasks = (1...count).map { i -> TaskItem in
             let task = TaskItem()
-            task.id = "task-\(UUID().uuidString)"
+            task.id = "task-\(i)"
             task.title = "Task \(i)"
             task.content = "Content \(i)"
             task.lastModified = Date()
@@ -126,9 +125,10 @@ class TaskRepository {
 
         try! realm.write {
             realm.deleteAll()
-            realm.add(tasks)
+            realm.add(tasks, update: .modified) 
         }
     }
+
 }
 
 

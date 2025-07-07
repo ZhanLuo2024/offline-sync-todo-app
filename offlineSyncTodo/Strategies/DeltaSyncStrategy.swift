@@ -13,18 +13,28 @@ class DeltaSyncStrategy: SyncStrategy {
     let deviceId: String
     let conflictStrategy: String
     let lastSyncTime: Date
+    let testCaseType: TestCaseType   
 
-    init(repository: TaskRepository, deviceId: String, conflictStrategy: String, lastSyncTime: Date) {
+    init(repository: TaskRepository,
+         deviceId: String,
+         conflictStrategy: String,
+         lastSyncTime: Date,
+         testCaseType: TestCaseType) {
         self.repository = repository
         self.deviceId = deviceId
         self.conflictStrategy = conflictStrategy
         self.lastSyncTime = lastSyncTime
+        self.testCaseType = testCaseType
     }
 
     func sync(completion: @escaping (SyncReport) -> Void) {
         let startTime = Date()
 
-        markLocalTasksForUpload()
+        if testCaseType == .rq1 {
+            markLocalTasksForUpload()
+        } else {
+            print("RQ2:rely on user edits.")
+        }
 
         repository.fetchRemoteTasks { remoteTasks in
             let deltaRemoteTasks = remoteTasks.filter { $0.lastModified > self.lastSyncTime }
@@ -41,7 +51,7 @@ class DeltaSyncStrategy: SyncStrategy {
         }
     }
 
-    // Automatically marks a gradient number of local tasks as modified (based on total count)
+    // Automatically marks a gradient number of local tasks as modified (only for RQ1)
     private func markLocalTasksForUpload() {
         DispatchQueue.main.async {
             let realm = try! Realm()
@@ -50,7 +60,6 @@ class DeltaSyncStrategy: SyncStrategy {
 
             let total = allTasks.count
 
-            // Determine how many to mark based on gradient thresholds
             let countToModify: Int
             switch total {
             case 0..<50:
@@ -63,7 +72,6 @@ class DeltaSyncStrategy: SyncStrategy {
                 countToModify = min(100, total)
             }
 
-            // Randomly pick tasks and mark as modified
             let shuffled = Array(allTasks).shuffled()
             let tasksToMark = shuffled.prefix(countToModify)
 
@@ -75,10 +83,9 @@ class DeltaSyncStrategy: SyncStrategy {
                 }
             }
 
-            print("Marked \(countToModify) of \(total) tasks as modified for delta sync.")
+            print("Marked \(countToModify) of \(total) tasks as modified for delta sync (RQ1).")
         }
     }
-
 
     private func applyRemoteTasks(_ remoteTasks: [TaskItem]) {
         DispatchQueue.main.async {
@@ -95,12 +102,10 @@ class DeltaSyncStrategy: SyncStrategy {
                     } else if self.conflictStrategy == "VV" {
                         let merged = ConflictResolver.resolve(local: local, remote: remote, deviceId: self.deviceId)
 
-                        // VV mode always marks merged tasks for upload
                         merged.isTitleModified = false
                         merged.isContentModified = false
                         merged.isPendingUpload = true
 
-                        // Detect conflict if VV vectors are concurrent
                         let titleConflict = local.title != remote.title &&
                             ConflictResolver.compareVV(
                                 local: ConflictResolver.toDictionary(local.titleVersion),
@@ -114,19 +119,16 @@ class DeltaSyncStrategy: SyncStrategy {
                             ) == .concurrent
 
                         if titleConflict || contentConflict {
-                            // Add to conflict list
                             DispatchQueue.main.async {
                                 ConflictCenter.shared.addConflict(local: local, remote: remote)
                             }
                         } else {
-                            // No conflict, write merged task
                             try! realm.write {
                                 realm.add(merged, update: .modified)
                             }
                         }
                     }
                 } else {
-                    // Local task doesn't exist, insert new
                     try! realm.write {
                         realm.add(remote)
                     }
@@ -135,7 +137,6 @@ class DeltaSyncStrategy: SyncStrategy {
         }
     }
 
-    /// Uploads all pending tasks to the server
     private func uploadLocalChanges(completion: @escaping (Int, Int) -> Void) {
         DispatchQueue.main.async {
             let realm = try! Realm()
@@ -145,13 +146,11 @@ class DeltaSyncStrategy: SyncStrategy {
             let tasksToUpload = Array(pending)
 
             guard !tasksToUpload.isEmpty else {
-                // Nothing to upload
                 completion(0, 0)
                 return
             }
 
             self.repository.uploadTasks(tasksToUpload) { payloadSize in
-                // Mark tasks as uploaded
                 try! realm.write {
                     for task in tasksToUpload {
                         task.isPendingUpload = false
@@ -164,3 +163,4 @@ class DeltaSyncStrategy: SyncStrategy {
         }
     }
 }
+

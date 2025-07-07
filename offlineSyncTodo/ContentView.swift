@@ -14,6 +14,12 @@ enum SyncMode: String, CaseIterable, Identifiable {
     var id: String { self.rawValue }
 }
 
+enum TestCase: String, CaseIterable, Identifiable {
+    case rq1 = "RQ1"
+    case rq2 = "RQ2"
+    var id: String { self.rawValue }
+}
+
 struct ContentView: View {
     @StateObject private var viewModel = MainViewModel()
     @State private var selectedTask: TaskItem? = nil
@@ -21,10 +27,30 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            VStack {
-                SyncModePicker(viewModel: viewModel)
+            VStack(spacing: 10) {
+                // Test case selector
+                Picker("Test Case", selection: $viewModel.testCaseType) {
+                    ForEach(TestCaseType.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(.horizontal)
 
-                ConflictStrategyPicker(viewModel: viewModel)
+                Picker("Sync Mode", selection: $viewModel.syncMode) {
+                    ForEach(SyncMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(.horizontal)
+
+                Picker("Strategy", selection: $viewModel.conflictStrategy) {
+                    Text("Last Write Wins").tag("LWW")
+                    Text("Version Vector").tag("VV")
+                }
+                .pickerStyle(SegmentedPickerStyle())
+                .padding(.horizontal)
 
                 TaskControlButtons(viewModel: viewModel)
 
@@ -43,53 +69,18 @@ struct ContentView: View {
                 Text(viewModel.syncReportText)
             }
             .sheet(item: $selectedTask) { task in
-                EditTaskView(task: $selectedTask, conflictStrategy: viewModel.conflictStrategy)
+                EditTaskView(
+                    task: $selectedTask,
+                    viewModel: viewModel,
+                    conflictStrategy: viewModel.conflictStrategy
+                )
             }
             .onAppear {
                 viewModel.fetchTasks()
-                NotificationCenter.default.removeObserver(self, name: Notification.Name("TaskUpdated"), object: nil)
-                NotificationCenter.default.addObserver(forName: Notification.Name("TaskUpdated"), object: nil, queue: .main) { _ in
-                    viewModel.fetchTasks()
-                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .didDetectConflicts)) { _ in
                 navigateToConflictResolution = true
             }
-            .navigationTitle("Offline Tasks")
-        }
-    }
-}
-
-// MARK: - subviews
-struct SyncModePicker: View {
-    @ObservedObject var viewModel: MainViewModel
-
-    var body: some View {
-        Picker("Sync Mode", selection: $viewModel.syncMode) {
-            ForEach(SyncMode.allCases) { mode in
-                Text(mode.rawValue).tag(mode)
-            }
-        }
-        .pickerStyle(SegmentedPickerStyle())
-        .padding()
-    }
-}
-
-struct ConflictStrategyPicker: View {
-    @ObservedObject var viewModel: MainViewModel
-
-    var body: some View {
-        VStack {
-            Text("Conflict Resolution Strategy")
-                .font(.subheadline)
-                .padding(.top, 4)
-
-            Picker("Strategy", selection: $viewModel.conflictStrategy) {
-                Text("Last Write Wins").tag("LWW")
-                Text("Version Vector").tag("VV")
-            }
-            .pickerStyle(SegmentedPickerStyle())
-            .padding(.horizontal)
         }
     }
 }
@@ -98,15 +89,26 @@ struct TaskControlButtons: View {
     @ObservedObject var viewModel: MainViewModel
 
     var body: some View {
-        VStack {
+        VStack(spacing: 4) {
             HStack {
                 Text("Generate Tasks:")
-                ForEach([10, 100, 500, 1000], id: \.self) { count in
+                ForEach([10, 100, 500, 1000], id: \ .self) { count in
                     Button("\(count)") {
                         viewModel.generateTasks(count: count)
-                    }
-                    .padding(4)
+                    }.padding(4)
                 }
+            }
+
+            HStack {
+                Text("Select Device:")
+                Button("Device A") {
+                    DeviceManager.shared.setDeviceId("devA12")
+                    viewModel.currentDevice = "devA12"
+                }.padding(4)
+                Button("Device B") {
+                    DeviceManager.shared.setDeviceId("devB34")
+                    viewModel.currentDevice = "devB34"
+                }.padding(4)
             }
         }
     }
@@ -118,10 +120,10 @@ struct TaskList: View {
 
     var body: some View {
         List {
-            ForEach(viewModel.tasks, id: \.id) { task in
+            ForEach(viewModel.tasks, id: \ .id) { task in
                 TaskRow(task: task, conflictStrategy: viewModel.conflictStrategy)
                     .onTapGesture {
-                        if viewModel.conflictStrategy == "VV" {
+                        if viewModel.testCaseType == .rq2 {
                             selectedTask = task
                         }
                     }
@@ -183,6 +185,7 @@ struct SyncButton: View {
         .buttonStyle(.borderedProminent)
     }
 }
+
 
 
 

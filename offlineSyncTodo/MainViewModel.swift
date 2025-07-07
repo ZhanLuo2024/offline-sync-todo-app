@@ -9,6 +9,8 @@ import Foundation
 import RealmSwift
 import Combine
 
+
+
 struct SyncLog: Identifiable {
     let id = UUID()
     let success: Bool
@@ -19,6 +21,12 @@ struct SyncLog: Identifiable {
     let strategy: String
     let payloadSize: Int
     let timestamp: Date
+}
+
+enum TestCaseType: String, CaseIterable, Identifiable {
+    case rq1 = "RQ1"
+    case rq2 = "RQ2"
+    var id: String { self.rawValue }
 }
 
 class MainViewModel: ObservableObject {
@@ -33,6 +41,8 @@ class MainViewModel: ObservableObject {
     @Published var reloadToken = UUID()
     @Published var isEditing = false
     @Published var syncLogs: [SyncLog] = []
+    @Published var currentDevice: String = DeviceManager.shared.id
+    @Published var testCaseType: TestCaseType = .rq1
     
     @Published var lastSyncTime: Date = {
         if let saved = UserDefaults.standard.object(forKey: "lastSyncTime") as? Date {
@@ -64,7 +74,8 @@ class MainViewModel: ObservableObject {
                 repository: repository,
                 deviceId: DeviceManager.shared.id,
                 conflictStrategy: conflictStrategy,
-                lastSyncTime: lastSyncTime
+                lastSyncTime: lastSyncTime,
+                testCaseType: testCaseType
             )
         }
     }
@@ -106,7 +117,7 @@ class MainViewModel: ObservableObject {
     }
     
     func fetchTasks() {
-        self.tasks = repository.fetchTasks()
+        self.tasks = Array(repository.fetchTasks())
     }
 }
 

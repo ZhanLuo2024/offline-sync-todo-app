@@ -11,13 +11,15 @@ import RealmSwift
 
 struct EditTaskView: View {
     @Binding var task: TaskItem?
+    @ObservedObject var viewModel: MainViewModel
     let conflictStrategy: String
+
     @State private var editedTitle: String = ""
     @State private var editedContent: String = ""
 
     var body: some View {
         NavigationView {
-            if task != nil {
+            if let task = task {
                 Form {
                     Section(header: Text("Title")) {
                         TextField("Title", text: $editedTitle)
@@ -29,15 +31,15 @@ struct EditTaskView: View {
 
                     Section {
                         Button("Save") {
-                            saveChanges()
+                            saveChanges(for: task)
                         }
                     }
                 }
                 .navigationTitle("Edit Task")
                 .navigationBarTitleDisplayMode(.inline)
                 .onAppear {
-                    editedTitle = task!.title
-                    editedContent = task!.content
+                    editedTitle = task.title
+                    editedContent = task.content
                 }
             } else {
                 ProgressView("Loading...")
@@ -45,47 +47,44 @@ struct EditTaskView: View {
         }
     }
 
-    func saveChanges() {
-        guard task != nil else { return }
-
+    func saveChanges(for task: TaskItem) {
         let realm = try! Realm()
-        var didModify = false
 
         try! realm.write {
-            if task!.title != editedTitle {
-                task!.title = editedTitle
-                task!.isTitleModified = true
-                didModify = true
-            }
+            var didModify = false
 
-            if task!.content != editedContent {
-                task!.content = editedContent
-                task!.isContentModified = true
+            if task.title != editedTitle {
+                task.title = editedTitle
+                task.isTitleModified = true
                 didModify = true
-            }
-            
-            if conflictStrategy == "VV" {
-                let deviceId = DeviceManager.shared.id
 
-                if task!.title != editedTitle {
-                    let current = task!.titleVersion[deviceId] ?? 0
-                    task!.titleVersion[deviceId] = current + 1
+                if conflictStrategy == "VV" {
+                    let deviceId = DeviceManager.shared.id
+                    let current = task.titleVersion[deviceId] ?? 0
+                    task.titleVersion[deviceId] = current + 1
                 }
+            }
 
-                if task!.content != editedContent {
-                    let current = task!.contentVersion[deviceId] ?? 0
-                    task!.contentVersion[deviceId] = current + 1
+            if task.content != editedContent {
+                task.content = editedContent
+                task.isContentModified = true
+                didModify = true
+
+                if conflictStrategy == "VV" {
+                    let deviceId = DeviceManager.shared.id
+                    let current = task.contentVersion[deviceId] ?? 0
+                    task.contentVersion[deviceId] = current + 1
                 }
             }
 
             if didModify {
-                task!.lastModified = Date()
-                NotificationCenter.default.post(name: Notification.Name("TaskUpdated"), object: nil)
+                task.lastModified = Date()
             }
         }
 
-        task = nil  // ✅ Binding 被解除，sheet 自動關閉
+        viewModel.fetchTasks()
+        self.task = nil          
     }
-
 }
+
 
