@@ -18,25 +18,29 @@ enum VVCompareResult {
 struct ConflictResolver {
     
     static func compareVV(local: [String: Int], remote: [String: Int]) -> VVCompareResult {
-        var localGreater = false
-        var remoteGreater = false
-        
+        var localDominates = true
+        var remoteDominates = true
+        var anyLocalGreater = false
+        var anyRemoteGreater = false
+
         let allKeys = Set(local.keys).union(remote.keys)
-        
+
         for key in allKeys {
             let l = local[key] ?? 0
             let r = remote[key] ?? 0
-            
-            if l > r {
-                localGreater = true
-            } else if r > l {
-                remoteGreater = true
+
+            if l < r {
+                localDominates = false
+                anyRemoteGreater = true
+            } else if l > r {
+                remoteDominates = false
+                anyLocalGreater = true
             }
         }
-        
-        if localGreater && !remoteGreater {
+
+        if localDominates && anyLocalGreater {
             return .localNewer
-        } else if remoteGreater && !localGreater {
+        } else if remoteDominates && anyRemoteGreater {
             return .remoteNewer
         } else {
             return .concurrent

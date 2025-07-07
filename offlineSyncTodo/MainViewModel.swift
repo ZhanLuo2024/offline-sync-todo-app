@@ -37,7 +37,11 @@ class MainViewModel: ObservableObject {
     @Published var isSyncing = false
     @Published var syncReportText = ""
     @Published var showReport = false
-    @Published var conflictStrategy = "LWW"
+    @Published var conflictStrategy = "LWW" {
+        didSet {
+            UserDefaults.standard.set(conflictStrategy, forKey: "conflictStrategy")
+        }
+    }
     @Published var reloadToken = UUID()
     @Published var isEditing = false
     @Published var syncLogs: [SyncLog] = []

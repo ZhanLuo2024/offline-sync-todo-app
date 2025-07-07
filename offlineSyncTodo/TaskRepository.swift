@@ -30,6 +30,8 @@ class TaskRepository {
                 completion([])
                 return
             }
+            
+            print(String(data: data, encoding: .utf8) ?? "no data")
 
             do {
                 let decoder = JSONDecoder()
@@ -68,6 +70,7 @@ class TaskRepository {
                 ]
             }
 
+            print("Uploading task:", dict)
             return dict
         }
 

@@ -49,6 +49,7 @@ struct EditTaskView: View {
 
     func saveChanges(for task: TaskItem) {
         let realm = try! Realm()
+        let deviceId = DeviceManager.shared.id
 
         try! realm.write {
             var didModify = false
@@ -59,7 +60,6 @@ struct EditTaskView: View {
                 didModify = true
 
                 if conflictStrategy == "VV" {
-                    let deviceId = DeviceManager.shared.id
                     let current = task.titleVersion[deviceId] ?? 0
                     task.titleVersion[deviceId] = current + 1
                 }
@@ -71,7 +71,6 @@ struct EditTaskView: View {
                 didModify = true
 
                 if conflictStrategy == "VV" {
-                    let deviceId = DeviceManager.shared.id
                     let current = task.contentVersion[deviceId] ?? 0
                     task.contentVersion[deviceId] = current + 1
                 }
@@ -79,12 +78,26 @@ struct EditTaskView: View {
 
             if didModify {
                 task.lastModified = Date()
+                task.isPendingUpload = true 
             }
+            
+            // 🪪 debug 打印
+            print("🔷 Task after save:")
+            print("- id: \(task.id)")
+            print("- title: \(task.title)")
+            print("- content: \(task.content)")
+            print("- isTitleModified: \(task.isTitleModified)")
+            print("- isContentModified: \(task.isContentModified)")
+            print("- isPendingUpload: \(task.isPendingUpload)")
+            print("- lastModified: \(task.lastModified)")
+            print("- titleVersion: \(task.titleVersion)")
+            print("- contentVersion: \(task.contentVersion)")
         }
 
         viewModel.fetchTasks()
-        self.task = nil          
+        self.task = nil
     }
+
 }
 
 

@@ -37,7 +37,13 @@ class DeltaSyncStrategy: SyncStrategy {
         }
 
         repository.fetchRemoteTasks { remoteTasks in
-            let deltaRemoteTasks = remoteTasks.filter { $0.lastModified > self.lastSyncTime }
+            let deltaRemoteTasks: [TaskItem]
+            if self.testCaseType == .rq2 {
+                deltaRemoteTasks = remoteTasks
+            } else {
+                deltaRemoteTasks = remoteTasks.filter { $0.lastModified > self.lastSyncTime }
+            }
+
             self.applyRemoteTasks(deltaRemoteTasks)
             self.uploadLocalChanges { itemsSent, payloadSize in
                 let report = SyncReport(
