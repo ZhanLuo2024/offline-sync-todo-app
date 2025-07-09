@@ -48,9 +48,16 @@ struct ConflictResolver {
     }
     
     static func resolve(local: TaskItem, remote: TaskItem, deviceId: String) -> TaskItem {
-        let merged = local
+        let merged = TaskItem()
+        merged.id = local.id
 
-        // title 比較
+        // 先拷貝本地
+        merged.title = local.title
+        merged.content = local.content
+        merged.titleVersion = local.titleVersion
+        merged.contentVersion = local.contentVersion
+
+        // title
         if local.title != remote.title {
             let localTitleVV = toDictionary(local.titleVersion)
             let remoteTitleVV = toDictionary(remote.titleVersion)
@@ -61,8 +68,8 @@ struct ConflictResolver {
             case .remoteNewer:
                 merged.title = remote.title
                 merged.titleVersion.removeAll()
-                for key in remote.titleVersion.keys {
-                    merged.titleVersion[key] = remote.titleVersion[key]
+                for entry in remote.titleVersion {
+                    merged.titleVersion[entry.key] = entry.value
                 }
             case .concurrent:
                 // 暫不處理衝突
@@ -72,7 +79,7 @@ struct ConflictResolver {
             }
         }
 
-        // content 比較
+        // content
         if local.content != remote.content {
             let localContentVV = toDictionary(local.contentVersion)
             let remoteContentVV = toDictionary(remote.contentVersion)
@@ -83,8 +90,8 @@ struct ConflictResolver {
             case .remoteNewer:
                 merged.content = remote.content
                 merged.contentVersion.removeAll()
-                for key in remote.contentVersion.keys {
-                    merged.contentVersion[key] = remote.contentVersion[key]
+                for entry in remote.contentVersion {
+                    merged.titleVersion[entry.key] = entry.value
                 }
             case .concurrent:
                 break
@@ -96,8 +103,6 @@ struct ConflictResolver {
         return merged
     }
 
-
-    
     static func toDictionary(_ map: Map<String, Int>) -> [String: Int] {
         return Dictionary(uniqueKeysWithValues: map.map { ($0.key, $0.value) })
     }
@@ -106,29 +111,50 @@ struct ConflictResolver {
 
 extension ConflictResolver {
     static func resolve(pair: ConflictPair, useRemote: Bool) {
-        let winner = useRemote ? pair.remote : pair.local
-        
-        if let realm = try? Realm() {
-            try? realm.write {
-                if let target = realm.object(ofType: TaskItem.self, forPrimaryKey: pair.local.id) {
-                    target.title = winner.title
-                    target.content = winner.content
-                    target.isPendingUpload = true
-                    target.lastModified = Date()
-                    
-                    // 把版本向量也設成贏家的版本（確保版本一致）
-                    target.titleVersion.removeAll()
-                    for key in winner.titleVersion.keys {
-                        target.titleVersion[key] = winner.titleVersion[key]
-                    }
-                    
-                    target.contentVersion.removeAll()
-                    for key in winner.contentVersion.keys {
-                        target.contentVersion[key] = winner.contentVersion[key]
+        let winner = useRemote ? pair.remote.detached() : pair.local.detached()
+
+        DispatchQueue.global().async {
+            do {
+                let realm = try Realm()
+                try realm.write {
+                    if let target = realm.object(ofType: TaskItem.self, forPrimaryKey: pair.local.id) {
+                        target.title = winner.title
+                        target.content = winner.content
+                        target.isPendingUpload = true
+                        target.lastModified = Date()
+                        
+                        target.titleVersion.removeAll()
+                        for entry in winner.titleVersion {
+                            target.titleVersion[entry.key] = entry.value
+                        }
+
+                        target.contentVersion.removeAll()
+                        for entry in winner.contentVersion {
+                            target.contentVersion[entry.key] = entry.value
+                        }
                     }
                 }
+
+                DispatchQueue.main.async {
+                    // 移除已解決的衝突
+                    ConflictCenter.shared.removeConflict(pair)
+
+                    // 自動上傳
+                    uploadResolvedTask(winner)
+                }
+
+            } catch {
+                print("Conflict resolution failed: \(error)")
             }
         }
     }
+
+    private static func uploadResolvedTask(_ task: TaskItem) {
+        let repository = TaskRepository()
+        repository.uploadTasks([task]) { payloadSize in
+            print("Resolved task uploaded. Payload size: \(payloadSize) bytes.")
+        }
+    }
 }
+
 

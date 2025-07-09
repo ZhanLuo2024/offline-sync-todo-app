@@ -9,8 +9,7 @@ import Foundation
 import RealmSwift
 import Combine
 
-
-
+/// 每次同步的記錄
 struct SyncLog: Identifiable {
     let id = UUID()
     let success: Bool
@@ -23,6 +22,7 @@ struct SyncLog: Identifiable {
     let timestamp: Date
 }
 
+/// 測試用例類型
 enum TestCaseType: String, CaseIterable, Identifiable {
     case rq1 = "RQ1"
     case rq2 = "RQ2"
@@ -47,7 +47,7 @@ class MainViewModel: ObservableObject {
     @Published var syncLogs: [SyncLog] = []
     @Published var currentDevice: String = DeviceManager.shared.id
     @Published var testCaseType: TestCaseType = .rq1
-    
+
     @Published var lastSyncTime: Date = {
         if let saved = UserDefaults.standard.object(forKey: "lastSyncTime") as? Date {
             return saved
@@ -60,11 +60,13 @@ class MainViewModel: ObservableObject {
         loadTasks()
     }
 
+    /// 加載本地任務
     func loadTasks() {
         let results = repository.fetchTasks()
         self.tasks = Array(results)
     }
 
+    /// 獲取當前同步策略
     func currentStrategy() -> SyncStrategy {
         switch syncMode {
         case .full:
@@ -84,6 +86,7 @@ class MainViewModel: ObservableObject {
         }
     }
 
+    /// 執行同步
     func performSync() {
         guard !isSyncing else { return }
         isSyncing = true
@@ -93,6 +96,13 @@ class MainViewModel: ObservableObject {
         strategy.sync { report in
             DispatchQueue.main.async {
                 self.isSyncing = false
+
+                if ConflictCenter.shared.hasPendingConflicts {
+                    // 檢測到衝突，不顯示 report，直接跳轉
+                    NotificationCenter.default.post(name: .didDetectConflicts, object: nil)
+                    return
+                }
+                
                 if report.itemsSent > 0 || report.itemsReceived > 0 {
                     self.lastSyncTime = Date()
                     UserDefaults.standard.set(self.lastSyncTime, forKey: "lastSyncTime")
@@ -103,15 +113,21 @@ class MainViewModel: ObservableObject {
                     strategy: self.conflictStrategy,
                     report: report
                 )
+
                 self.showReport = true
-                
-                if !ConflictCenter.shared.conflicts.isEmpty {
-                    NotificationCenter.default.post(name: .didDetectConflicts, object: nil)
-                }
             }
         }
     }
-    
+
+    /// 當衝突全部解決後重置狀態
+    func onConflictResolved() {
+        DispatchQueue.main.async {
+            self.isSyncing = false
+            self.fetchTasks()
+        }
+    }
+
+    /// 生成測試任務
     func generateTasks(count: Int) {
         self.tasks = []
         self.reloadToken = UUID()
@@ -119,12 +135,14 @@ class MainViewModel: ObservableObject {
         repository.generateDummyTasks(count: count)
         loadTasks()
     }
-    
+
+    /// 重新獲取本地任務
     func fetchTasks() {
         self.tasks = Array(repository.fetchTasks())
     }
 }
 
+/// 衝突通知
 extension Notification.Name {
     static let didDetectConflicts = Notification.Name("didDetectConflicts")
 }

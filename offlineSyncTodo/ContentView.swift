@@ -22,8 +22,9 @@ enum TestCase: String, CaseIterable, Identifiable {
 
 struct ContentView: View {
     @StateObject private var viewModel = MainViewModel()
+    @ObservedObject private var conflictCenter = ConflictCenter.shared
     @State private var selectedTask: TaskItem? = nil
-    @State private var navigateToConflictResolution = false
+    @State private var showConflictResolution = false
 
     var body: some View {
         NavigationStack {
@@ -60,8 +61,8 @@ struct ContentView: View {
 
                 SyncButton(viewModel: viewModel)
             }
-            .navigationDestination(isPresented: $navigateToConflictResolution) {
-                ConflictResolutionView()
+            .navigationDestination(isPresented: $showConflictResolution) {
+                ConflictResolutionView(viewModel: viewModel)
             }
             .alert("Sync Report", isPresented: $viewModel.showReport) {
                 Button("OK", role: .cancel) {}
@@ -78,8 +79,11 @@ struct ContentView: View {
             .onAppear {
                 viewModel.fetchTasks()
             }
+            .onChange(of: conflictCenter.conflicts) {
+                showConflictResolution = conflictCenter.hasPendingConflicts
+            }
             .onReceive(NotificationCenter.default.publisher(for: .didDetectConflicts)) { _ in
-                navigateToConflictResolution = true
+                self.showConflictResolution = true
             }
         }
     }

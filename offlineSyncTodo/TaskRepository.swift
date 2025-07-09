@@ -25,20 +25,40 @@ class TaskRepository {
         }
 
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
-            guard let data = data else {
-                print("Fetch error: \(error?.localizedDescription ?? "Unknown error")")
+            if let error = error {
+                print("Fetch error: \(error.localizedDescription)")
                 completion([])
                 return
             }
-            
-            print(String(data: data, encoding: .utf8) ?? "no data")
+
+            guard let data = data else {
+                print("No data received")
+                completion([])
+                return
+            }
+
+            print("Response JSON string:\n\(String(data: data, encoding: .utf8) ?? "no data")")
 
             do {
                 let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
+
+                // 支持毫秒的 ISO8601 格式
+                let isoFormatter = ISO8601DateFormatter()
+                isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+                decoder.dateDecodingStrategy = .custom { decoder in
+                    let container = try decoder.singleValueContainer()
+                    let dateStr = try container.decode(String.self)
+                    if let date = isoFormatter.date(from: dateStr) {
+                        return date
+                    }
+                    throw DecodingError.dataCorruptedError(in: container,
+                        debugDescription: "Invalid ISO8601 date: \(dateStr)")
+                }
 
                 let decoded = try decoder.decode(TaskListResponse.self, from: data)
                 completion(decoded.tasks)
+
             } catch {
                 print("Decode error: \(error)")
                 completion([])
@@ -47,6 +67,7 @@ class TaskRepository {
 
         task.resume()
     }
+
 
 
     func uploadTasks(_ tasks: [TaskItem], completion: @escaping (Int) -> Void) {

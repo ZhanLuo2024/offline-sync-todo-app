@@ -25,6 +25,13 @@ class FullSyncStrategy: SyncStrategy {
 
         repository.fetchRemoteTasks { remoteTasks in
             self.applyRemoteTasks(remoteTasks)
+            
+//            if ConflictCenter.shared.hasPendingConflicts {
+//                print("檢測到未解決的衝突，終止上傳")
+//                completion(SyncReport(itemsSent: 0, itemsReceived: remoteTasks.count, duration: Date().timeIntervalSince(startTime), payloadSize: 0))
+//                return
+//            }
+            
             self.uploadLocalChanges { itemsSent, payloadSize in
                 let report = SyncReport(
                     itemsSent: itemsSent,
