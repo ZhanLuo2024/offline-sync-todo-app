@@ -68,8 +68,6 @@ class TaskRepository {
         task.resume()
     }
 
-
-
     func uploadTasks(_ tasks: [TaskItem], completion: @escaping (Int) -> Void) {
         let syncModeStr = UserDefaults.standard.string(forKey: "syncMode") ?? "full"
         let conflictStrategy = UserDefaults.standard.string(forKey: "conflictStrategy") ?? "LWW"
@@ -91,7 +89,7 @@ class TaskRepository {
                 ]
             }
 
-            print("Uploading task:", dict)
+            print("⬆️ Upload payload — title: \(task.title), titleVersion: \(task.titleVersion), contentVersion: \(task.contentVersion)")
             return dict
         }
 

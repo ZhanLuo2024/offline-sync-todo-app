@@ -85,6 +85,9 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: .didDetectConflicts)) { _ in
                 self.showConflictResolution = true
             }
+            .onReceive(NotificationCenter.default.publisher(for: .didUpdateFromRemote)) { _ in
+                viewModel.fetchTasks()
+            }
         }
     }
 }

@@ -138,11 +138,19 @@ class MainViewModel: ObservableObject {
 
     /// 重新獲取本地任務
     func fetchTasks() {
-        self.tasks = Array(repository.fetchTasks())
+        DispatchQueue.main.async {
+            let realm = try! Realm()
+            let objects = realm.objects(TaskItem.self)
+            self.tasks = objects.map { $0.detached() }
+            self.reloadToken = UUID()
+        }
     }
+
+
 }
 
 /// 衝突通知
 extension Notification.Name {
     static let didDetectConflicts = Notification.Name("didDetectConflicts")
+    static let didUpdateFromRemote = Notification.Name("didUpdateFromRemote")
 }

@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import RealmSwift
+
 
 struct ConflictResolutionView: View {
     @ObservedObject var conflictCenter = ConflictCenter.shared
@@ -132,14 +134,15 @@ struct ConflictDetailSheet: View {
     }
 
     private func resolveConflict(useRemote: Bool) {
-        ConflictResolver.resolve(pair: pair, useRemote: useRemote)
-        ConflictCenter.shared.removeConflict(pair)
-
-        // 如果已經沒有衝突了，通知主頁刷新
-        if ConflictCenter.shared.conflicts.isEmpty {
-            viewModel.onConflictResolved()
+        ConflictResolver.resolveAndUpload(pair: pair, useRemote: useRemote) {
+            DispatchQueue.main.async {
+                
+//                viewModel.loadTasks()
+                viewModel.fetchTasks()
+                viewModel.onConflictResolved()
+                onClose()
+            }
         }
-
-        onClose()
     }
+
 }

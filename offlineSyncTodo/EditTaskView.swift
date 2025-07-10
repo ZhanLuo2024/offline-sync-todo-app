@@ -31,7 +31,7 @@ struct EditTaskView: View {
 
                     Section {
                         Button("Save") {
-                            saveChanges(for: task)
+                            saveChanges(for: task.id)
                         }
                     }
                 }
@@ -47,57 +47,58 @@ struct EditTaskView: View {
         }
     }
 
-    func saveChanges(for task: TaskItem) {
+    func saveChanges(for taskId: String) {
         let realm = try! Realm()
         let deviceId = DeviceManager.shared.id
 
         try! realm.write {
+            guard let realmTask = realm.object(ofType: TaskItem.self, forPrimaryKey: taskId) else {
+                print("Could not find TaskItem with id \(taskId)")
+                return
+            }
+
             var didModify = false
 
-            if task.title != editedTitle {
-                task.title = editedTitle
-                task.isTitleModified = true
+            if realmTask.title != editedTitle {
+                realmTask.title = editedTitle
+                realmTask.isTitleModified = true
                 didModify = true
 
                 if conflictStrategy == "VV" {
-                    let current = task.titleVersion[deviceId] ?? 0
-                    task.titleVersion[deviceId] = current + 1
+                    let current = realmTask.titleVersion[deviceId] ?? 0
+                    realmTask.titleVersion[deviceId] = current + 1
                 }
             }
 
-            if task.content != editedContent {
-                task.content = editedContent
-                task.isContentModified = true
+            if realmTask.content != editedContent {
+                realmTask.content = editedContent
+                realmTask.isContentModified = true
                 didModify = true
 
                 if conflictStrategy == "VV" {
-                    let current = task.contentVersion[deviceId] ?? 0
-                    task.contentVersion[deviceId] = current + 1
+                    let current = realmTask.contentVersion[deviceId] ?? 0
+                    realmTask.contentVersion[deviceId] = current + 1
                 }
             }
 
             if didModify {
-                task.lastModified = Date()
-                task.isPendingUpload = true 
+                realmTask.lastModified = Date()
+                realmTask.isPendingUpload = true
             }
-            
-            // 🪪 debug 打印
+
             print("🔷 Task after save:")
-            print("- id: \(task.id)")
-            print("- title: \(task.title)")
-            print("- content: \(task.content)")
-            print("- isTitleModified: \(task.isTitleModified)")
-            print("- isContentModified: \(task.isContentModified)")
-            print("- isPendingUpload: \(task.isPendingUpload)")
-            print("- lastModified: \(task.lastModified)")
-            print("- titleVersion: \(task.titleVersion)")
-            print("- contentVersion: \(task.contentVersion)")
+            print("- id: \(realmTask.id)")
+            print("- title: \(realmTask.title)")
+            print("- content: \(realmTask.content)")
+            print("- titleVersion: \(realmTask.titleVersion)")
+            print("- contentVersion: \(realmTask.contentVersion)")
         }
 
         viewModel.fetchTasks()
         self.task = nil
     }
-
 }
+
+
 
 
