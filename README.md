@@ -16,10 +16,12 @@ The engine addresses one of the most challenging aspects of mobile engineering: 
 
 The architecture bridges the gap between local reactive persistence (Realm) and cloud-scale infrastructure (AWS). It ensures that data modifications originating from any device are tracked via logical timestamps rather than fragile physical system clocks.
 
+![System Architecture](./Images/arch_diagram.png)
+
 
 
 **data-flow**
-*(Note: Refer to the architecture diagrams in the 'Docs' folder for detailed interaction flows between iOS, Lambda, and DynamoDB.)*
+![data-flow](./Images/data_sync_flow.png)
 
 ### Cloud Stack:
 * **Amazon API Gateway**: RESTful entry point for sync requests.
